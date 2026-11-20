@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>持仓页那行绿字</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #eef1ee; color: #1f2622; line-height: 1.6; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 20px 14px 40px; }
+  h1 { font-size: 25px; letter-spacing: 1px; }
+  .lead { color: #56605a; font-size: 14px; margin: 4px 0 14px; }
+  .card { background: #fff; border-radius: 8px; padding: 14px; border: 1px solid #d4dbd5; margin-bottom: 14px; min-width: 0; }
+  .card h2 { font-size: 15px; color: #56605a; font-weight: 600; margin-bottom: 8px; }
+  input, textarea, select { font: inherit; font-size: 14px; padding: 4px 6px; border: 1px solid #b9c3bc; border-radius: 5px; width: 100%; min-width: 0; background: #fbfdfb; }
+  textarea { min-height: 84px; resize: vertical; font-variant-numeric: tabular-nums; }
+  .bad { border-color: #b23a2b !important; background: #fff0ec !important; }
+  label { font-size: 12px; color: #66706a; display: block; }
+  button { font: inherit; font-size: 13px; padding: 6px 11px; border-radius: 5px; border: 1px solid #1f6b4a; background: #1f6b4a; color: #fff; cursor: pointer; }
+  button.ghost { background: #fff; color: #1f6b4a; }
+  button.chip { padding: 2px 10px; font-size: 12px; background: #fff; color: #56605a; border-color: #c6cfc8; }
+  button.chip.on { background: #1f6b4a; color: #fff; border-color: #1f6b4a; }
+  .row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+  @media (max-width: 680px) { .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; align-items: center; font-size: 12px; color: #66706a; }
+  .presets, .dl { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  #error { display: none; background: #fff0ec; border: 1px solid #e0b2a7; color: #8a2a1b; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; overflow-wrap: anywhere; }
+  /* 顶部「持仓页」那一条 */
+  .hold { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: baseline; border-bottom: 1px dashed #d4dbd5; padding-bottom: 10px; margin-bottom: 10px; }
+  .hold div { min-width: 0; }
+  .hold small { display: block; font-size: 12px; color: #7a847e; }
+  .hold b { font-size: 26px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .up { color: #c0392b; } .down { color: #1e8a4c; }
+  #summary { font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+  #facts { margin: 8px 0 0 18px; font-size: 14px; } #facts li { margin: 3px 0; overflow-wrap: anywhere; }
+  #chart { width: 100%; height: auto; display: block; }
+  .legend { font-size: 12px; color: #66706a; display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px; }
+  .tw { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 4px 6px; border-top: 1px solid #e8ece8; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: #66706a; font-weight: 600; border-top: none; font-size: 12px; position: sticky; top: 0; background: #fff; }
+  tr.mark td { background: #f4f8f5; font-weight: 700; }
+  tr.now td { font-weight: 700; color: #1f6b4a; }
+  td .bar { display: inline-block; height: 8px; background: #8fc3a5; vertical-align: middle; border-radius: 2px; }
+  .two { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .two { grid-template-columns: minmax(0, 1fr); } }
+  .sugs { list-style: none; }
+  .sugs li { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; padding: 8px 0; border-top: 1px solid #eef1ee; font-size: 14px; }
+  .sugs li:first-child { border-top: none; } .sugs li span { overflow-wrap: anywhere; min-width: 0; } .sugs li button { flex: none; }
+  .rules { font-size: 13px; } .rules p { margin: 4px 0; }
+  .note { font-size: 12px; color: #7a847e; margin-top: 8px; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>持仓页那行绿字</h1>
+  <p class="lead">把一笔钱每期的涨跌（或每期的价格）贴进来：它按先后顺序一期期乘出来，告诉你现在离最高点、离本金各差多少，要再涨多少才回去，最深跌过多少、多久回来，以及「平均每月都在涨，怎么还亏」到底差在哪。</p>
+
+  <div class="card">
+    <h2>这笔钱怎么走过来的</h2>
+    <div class="chips" id="modeChips">填法：<button class="chip" data-mode="pct">每期涨跌 %</button><button class="chip" data-mode="price">每期价格</button></div>
+    <label for="list" id="listLabel"></label>
+    <textarea id="list" spellcheck="false"></textarea>
+    <div class="row">
+      <div><label for="start">本金（元）</label><input id="start" inputmode="decimal"></div>
+      <div><label for="unit">每期是</label><select id="unit"></select></div>
+      <div><label for="weight">仓位（%，其余是不动的现金）</label><input id="weight" inputmode="decimal"></div>
+      <div><label for="future">假如之后每期涨（%）</label><input id="future" inputmode="decimal"></div>
+    </div>
+    <div class="presets" id="presets"></div>
+  </div>
+
+  <div id="error"></div>
+
+  <div id="out" style="display:none;">
+    <div class="card">
+      <div class="hold" id="hold"></div>
+      <div id="summary"></div>
+      <ul id="facts"></ul>
+    </div>
+
+    <div class="card">
+      <h2>一期一期走下来</h2>
+      <svg id="chart" viewBox="0 0 640 300" role="img" aria-label="金额走势与离最高点的回撤"></svg>
+      <div class="legend"><span><i style="background:#1f2622"></i>每期末金额</span><span><i style="background:#c9a227"></i>到这期为止的最高点</span><span><i style="background:#8fc3a5;height:8px"></i>离最高点跌了多少（下半区）</span><span><i style="background:#b9c3bc"></i>本金</span></div>
+    </div>
+
+    <div class="two">
+      <div class="card">
+        <h2>逐期明细</h2>
+        <div class="tw"><table id="rows"></table></div>
+        <p class="note">粗体是最大回撤的高点和最低点。</p>
+      </div>
+      <div class="card">
+        <h2>跌了多少，要涨多少才回来</h2>
+        <div class="tw"><table id="ladder"></table></div>
+        <p class="note">跌 d 之后要涨 d ÷ (1 − d)。高亮的一行是这串涨跌里的最大回撤。</p>
+      </div>
+    </div>
+
+    <div class="card" id="sugCard">
+      <h2>换个条件看看</h2>
+      <ul class="sugs" id="sugs"></ul>
+      <p class="note">每条只改一处，按改完之后重算的结果写；点「照这个改」会填回上面，可以再改回来。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>导出与保存</h2>
+    <div class="dl">
+      <button id="dlPNG">结果卡 PNG</button>
+      <button class="ghost" id="dlCSV">CSV</button>
+      <button class="ghost" id="dlMD">Markdown</button>
+      <button class="ghost" id="dlJSON">JSON 备份</button>
+      <button class="ghost" id="reset">恢复默认例子</button>
+    </div>
+    <p class="note">填的内容自动保存在这台设备的浏览器里，刷新后还在；不上传、不联网。</p>
+  </div>
+
+  <div class="card rules">
+    <h2>怎么算的、算不了什么</h2>
+    <p><b>逐期相乘</b>：每期末金额 = 上期末 × (1 + 仓位 × 这期涨跌)。价格模式下，这期涨跌 = 这期价格 ÷ 上期价格 − 1。</p>
+    <p><b>两种平均</b>：简单平均 = 每期涨跌加起来 ÷ 期数；复合平均 = (期末 ÷ 本金) 开 n 次方 − 1，这才是「实际每期涨了多少」。有涨有跌时简单平均总是更大，差多少取决于涨跌幅度。</p>
+    <p><b>回撤</b>：每期末金额比到那时为止的最高点低多少。最大回撤是其中最深的一次。跌了 d 要涨 d ÷ (1 − d) 才回来，跌 50% 要涨 100%。</p>
+    <p><b>顺序</b>：同一串涨跌换先后，最后金额完全一样，但回撤不一样；最坏的排法是把所有跌的连在一起放在最后。</p>
+    <p>算不了：手续费、分红、中途加钱或取钱、税；不预测以后会涨还是跌，「假如之后每期涨」只是你填的假设。默认例子的涨跌是虚构的，不对应任何真实基金或股票。</p>
+  </div>
+</div>
+
+  <script>
+/* 持仓页那行绿字 · 计算核心（无 DOM，可在 node 里 require）
+ *
+ * 问题：一笔钱经历了一串涨跌，现在离最高点、离本金各差多少？要再涨多少才回去？
+ *       「平均每月涨了」为什么还亏？最大回撤多深、多久回来？仓位放一半会怎样？
+ *
+ * 模型（全部写在页面「怎么算的」里）：
+ *   每期涨跌 r_i（小数，r_i ≥ −1）；仓位 w（0–1，其余是不动的现金）→ 实际每期 x_i = w·r_i。
+ *   价格模式：r_i = 价格_i / 价格_(i−1) − 1。
+ *   净值 V_0 = 本金，V_i = V_(i−1)·(1 + x_i)。累计 = V_n/V_0 − 1。
+ *   简单平均 a = Σx_i / n；复合平均 g = (V_n/V_0)^(1/n) − 1；两者差 = 波动拖累（百分点）。
+ *   回撤 dd_i = V_i / max(V_0..V_i) − 1；最大回撤 = min dd_i。
+ *   跌了 d 要涨 d/(1−d) 才回来；之后每期涨 u，回到目标 T 要 k = ⌈ln(T/V_n)/ln(1+u)⌉ 期。
+ *   顺序：最后净值与顺序无关（乘法交换）；最坏顺序（先涨完再把跌的连在一起）最大回撤 = 1 − Π_{x_i<0}(1+x_i)。
+ *   不做：手续费、分红、加减仓、税、预测未来涨跌。
+ */
+(function (root) {
+  'use strict';
+  const MAXN = 500, MAXMONEY = 1e12;
+  const UNITS = ['天', '周', '月', '年', '期'];
+  const LADDER = [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 0.9];
+
+  function bad(field, message) { const e = new Error(message); e.field = field; throw e; }
+  function num(s) {
+    const t = String(s == null ? '' : s).replace(/[,，\s]/g, '');
+    if (!/^\d+(\.\d+)?$/.test(t)) return NaN;
+    return Number(t);
+  }
+  function round(x, d) { const p = Math.pow(10, d); return Math.round(Number((x * p).toPrecision(15))) / p; }
+  function fmt(x, d) {
+    const r = round(x, d);
+    let s = Math.abs(r).toFixed(d);
+    if (d > 0) s = s.replace(/\.?0+$/, '');
+    const parts = s.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (r < 0 ? '-' : '') + parts.join('.');
+  }
+  /* 百分比：保留 1 位；绝对值不到 0.05% 但不为 0 时多给一位有效数字，不显示成 0 */
+  function pct(x, d) {
+    d = d == null ? 1 : d;
+    const v = x * 100;
+    if (v !== 0 && Math.abs(round(v, d)) === 0) { const e = Math.floor(Math.log10(Math.abs(v))); d = Math.min(8, -e); }
+    /* 跌了 99.99…% 不能显示成「-100%」（那是归零）：多给小数位，还不够就写「99.99+%」 */
+    if (Math.abs(x) < 1 && Math.abs(round(v, d)) >= 100) {
+      while (d < 4 && Math.abs(round(v, d)) >= 100) d++;
+      if (Math.abs(round(v, d)) >= 100) return (v < 0 ? '-' : '') + '99.99+%';
+    }
+    return fmt(v, d) + '%';
+  }
+  function spct(x, d) { const s = pct(x, d); return (s[0] === '-' || /^0%$/.test(s)) ? s : '+' + s; }
+  /* 金额：整数不带小数；有小数就补齐两位 */
+  function money(x) { const t = fmt(x, 2); return /\.\d$/.test(t) ? t + '0' : t; }
+  /* 数量与序数的量词：「7 个月」不写成「7 月」（会被读成七月） */
+  const QTY = { 天: '天', 周: '周', 月: '个月', 年: '年', 期: '期' };
+  function q(k, U) { return fmt(k, 0) + ' ' + QTY[U]; }
+  /* 代回输入框用的原值（不加千分位，最多 6 位小数） */
+  function raw(x) { return String(round(x, 6)); }
+
+  /* ── 输入解析 ── */
+  function tokens(text) {
+    return String(text == null ? '' : text).replace(/[−–—]/g, '-').replace(/＋/g, '+').replace(/％/g, '%')
+      .split(/[\s,，、;；|]+/).map((t) => t.trim()).filter(Boolean);
+  }
+  function parsePct(text) {
+    const tk = tokens(text);
+    if (!tk.length) bad('list', '还没填涨跌：每个数是一期的涨跌幅，比如「+5 -3 -12」');
+    if (tk.length > MAXN) bad('list', '最多 ' + MAXN + ' 期，现在 ' + tk.length + ' 期');
+    return tk.map((t, i) => {
+      const m = t.match(/^([+-]?)(\d+(?:\.\d+)?)%?$/);
+      if (!m) bad('list', '第 ' + (i + 1) + ' 个数「' + t.slice(0, 16) + '」看不懂：要写成「+5」「-3.2」「4%」这样');
+      const v = Number(m[2]) * (m[1] === '-' ? -1 : 1);
+      if (v < -100) bad('list', '第 ' + (i + 1) + ' 期跌了 ' + fmt(-v, 2) + '%：一期最多跌 100%（归零）');
+      if (v > 10000) bad('list', '第 ' + (i + 1) + ' 期涨幅超过 10,000%，先确认是不是多打了零');
+      return v / 100;
+    });
+  }
+  function parsePrice(text) {
+    const tk = tokens(text);
+    if (tk.length < 2) bad('list', '价格模式至少要 2 个价格（第一个是起点）');
+    if (tk.length > MAXN + 1) bad('list', '价格最多 ' + (MAXN + 1) + ' 个，现在 ' + tk.length + ' 个');
+    const ps = tk.map((t, i) => {
+      const v = num(t);
+      if (!(v > 0)) bad('list', '第 ' + (i + 1) + ' 个价格「' + t.slice(0, 16) + '」要是大于 0 的数');
+      if (v > MAXMONEY) bad('list', '第 ' + (i + 1) + ' 个价格太大');
+      return v;
+    });
+    const rs = [];
+    for (let i = 1; i < ps.length; i++) rs.push(ps[i] / ps[i - 1] - 1);
+    return { ps, rs };
+  }
+  function parse(inp) {
+    const mode = inp.mode === 'price' ? 'price' : 'pct';
+    let rs, prices = null;
+    if (mode === 'price') { const o = parsePrice(inp.list); rs = o.rs; prices = o.ps; } else rs = parsePct(inp.list);
+    const start = num(inp.start);
+    if (!(start > 0)) bad('start', '本金要是大于 0 的数（元）');
+    if (start > MAXMONEY) bad('start', '本金最多 ' + fmt(MAXMONEY, 0) + ' 元');
+    const unit = UNITS.indexOf(inp.unit) >= 0 ? inp.unit : '期';
+    const w = num(inp.weight);
+    if (!(w > 0 && w <= 100)) bad('weight', '仓位要在 0 到 100% 之间（不含 0）');
+    const gs = String(inp.future == null ? '' : inp.future).trim().replace(/[−–—]/g, '-').replace(/%$/, '');
+    const gm = gs.match(/^([+-]?)(\d+(?:\.\d+)?)$/);
+    if (!gm) bad('future', '之后每期涨多少要填一个数（%），比如 1');
+    const u = Number(gm[2]) * (gm[1] === '-' ? -1 : 1) / 100;
+    if (!(u > -1) || u > 100) bad('future', '之后每期涨跌要在 -100% 到 10,000% 之间');
+    return { mode, rs, prices, start, unit, w: w / 100, u };
+  }
+
+  /* ── 核心 ── */
+  function path(start, xs) {
+    const V = [start];
+    for (const x of xs) V.push(V[V.length - 1] * (1 + x));
+    return V;
+  }
+  /* 回撤：逐点跟踪最高点；返回最大回撤、它的高点/低点位置、之后第一次回到那个高点的位置 */
+  function drawdown(V) {
+    let peak = V[0], pk = 0, mdd = 0, mP = 0, mT = 0;
+    const dd = V.map((v, i) => {
+      if (v > peak) { peak = v; pk = i; }
+      const d = peak > 0 ? v / peak - 1 : 0;
+      if (d < mdd) { mdd = d; mP = pk; mT = i; }
+      return d;
+    });
+    let rec = null;
+    if (mdd < 0) for (let j = mT + 1; j < V.length; j++) if (V[j] >= V[mP]) { rec = j; break; }
+    /* 最长「水下」：从某个高点跌下去到重新回到（或到最后还没回到）的期数 */
+    let longest = 0, from = null, lf = null, lt = null, cur = null;
+    for (let i = 0; i < V.length; i++) {
+      if (dd[i] < 0) { if (cur == null) cur = i - 1; }
+      else if (cur != null) { if (i - cur > longest) { longest = i - cur; lf = cur; lt = i; } cur = null; }
+    }
+    if (cur != null && V.length - 1 - cur > longest) { longest = V.length - 1 - cur; lf = cur; lt = null; from = cur; }
+    return { dd, mdd, peakAt: mP, troughAt: mT, recoverAt: rec, under: { len: longest, from: lf, to: lt, open: from != null } };
+  }
+  /* 跌了 d（正数，0–1）要涨多少才回来 */
+  function needGain(d) { return d >= 1 ? Infinity : d / (1 - d); }
+  /* 每期涨 u，从 v 到 target 要几期（最少的整数 k 使 v(1+u)^k ≥ target） */
+  function periodsTo(v, target, u) {
+    if (!(v > 0)) return null;
+    if (v >= target) return 0;
+    if (!(u > 0)) return null;
+    let k = Math.ceil(Math.log(target / v) / Math.log(1 + u) - 1e-9);
+    if (k < 1) k = 1;
+    while (v * Math.pow(1 + u, k) < target * (1 - 1e-12)) k++;
+    while (k > 1 && v * Math.pow(1 + u, k - 1) >= target * (1 - 1e-12)) k--;
+    return k;
+  }
+  function worstOrderDD(xs) { let p = 1; xs.forEach((x) => { if (x < 0) p *= 1 + x; }); return p - 1; }
+  function worstOrder(xs) { return xs.filter((x) => x >= 0).concat(xs.filter((x) => x < 0)); }
+
+  function calculate(inp) {
+    const P = parse(inp);
+    const n = P.rs.length, xs = P.rs.map((r) => P.w * r), U = P.unit;
+    const V = path(P.start, xs), end = V[n];
+    const total = end / P.start - 1;
+    const arith = xs.reduce((a, b) => a + b, 0) / n;
+    const geo = end > 0 ? Math.pow(end / P.start, 1 / n) - 1 : -1;
+    const D = drawdown(V);
+    const peak = Math.max.apply(null, V);
+    const peakIdx = V.indexOf(peak);
+    const fromPeak = end / peak - 1;
+    const needPeak = end > 0 ? peak / end - 1 : Infinity;
+    const needStart = end > 0 ? P.start / end - 1 : Infinity;
+    const kPeak = periodsTo(end, peak, P.u), kStart = periodsTo(end, P.start, P.u);
+    const wDD = worstOrderDD(xs);
+    /* 很多次大跌连乘后剩下的比例可能在浮点里下溢成 0，但只要没有哪期跌 100% 就不是归零，不写成 100% */
+    const wTxt = (wDD <= -1 && xs.every((x) => x > -1)) ? '99.99+%' : pct(-wDD);
+    const ups = xs.filter((x) => x > 0).length, downs = xs.filter((x) => x < 0).length;
+    let bigDrop = null, bigRise = null;
+    xs.forEach((x, i) => { if (x < 0 && (!bigDrop || x < bigDrop.x)) bigDrop = { i: i + 1, x, r: P.rs[i] }; if (x > 0 && (!bigRise || x > bigRise.x)) bigRise = { i: i + 1, x }; });
+    const rows = xs.map((x, i) => ({ i: i + 1, r: P.rs[i], x, v: V[i + 1], dd: D.dd[i + 1], price: P.prices ? P.prices[i + 1] : null }));
+    const zero = end === 0;
+    const L = (i) => i === 0 ? '起点' : '第 ' + i + ' ' + QTY[U] + '末';
+
+    let summary;
+    if (zero) summary = q(n, U) + '后归零了：本金 ' + money(P.start) + ' 元全部亏完，涨多少都回不来';
+    else if (fromPeak < 0) summary = q(n, U) + '累计 ' + spct(total) + '，离最高点还差 ' + pct(-fromPeak) + '，要再涨 ' + pct(needPeak) + ' 才回得去';
+    else summary = q(n, U) + '累计 ' + spct(total) + '，现在就在最高点上' + (D.mdd < 0 ? '（中途最深跌过 ' + pct(-D.mdd) + '）' : '');
+
+    const facts = [];
+    const flat = n - ups - downs;
+    const cnt = [ups ? '涨了 ' + q(ups, U) : '', downs ? '跌了 ' + q(downs, U) : '', flat ? q(flat, U) + '没动' : ''].filter(Boolean).join('、');
+    facts.push('本金 ' + money(P.start) + ' 元，' + q(n, U) + '后 ' + money(end) + ' 元，' + (end === P.start ? '不赚不亏' : (end > P.start ? '赚 ' : '亏 ') + money(Math.abs(end - P.start)) + ' 元') + '；' + cnt + (P.w < 1 ? '（仓位 ' + fmt(P.w * 100, 2) + '%，涨跌按仓位折算）' : '') + '。');
+    if (zero) facts.push('有一' + QTY[U] + '跌了 100%，之后不管涨多少，0 乘什么都还是 0。');
+    else if (downs > 0) {
+      const gap = arith - geo;
+      let t = '每' + U + '涨跌的简单平均是 ' + spct(arith, 2) + '，实际每' + U + '复合 ' + spct(geo, 2) + '，差 ' + fmt(gap * 100, 2) + ' 个百分点';
+      if (arith > 0 && geo < 0) t += '：这就是「平均每' + U + '都在涨，钱却少了」的原因，跌的那几' + QTY[U] + '要用更大的涨幅才补得回来';
+      else t += '，涨跌越大差得越多';
+      facts.push(t + '。');
+    }
+    if (D.mdd < 0) {
+      let t = '最大回撤 ' + pct(-D.mdd) + '：从' + L(D.peakAt) + '的 ' + money(V[D.peakAt]) + ' 元跌到' + L(D.troughAt) + '的 ' + money(V[D.troughAt]) + ' 元';
+      if (D.recoverAt != null) t += '，' + L(D.recoverAt) + '回到那个高点，从最低点回来用了 ' + q(D.recoverAt - D.troughAt, U);
+      else t += '，到现在还没回到那个高点';
+      facts.push(t + '。');
+    } else facts.push('全程没有跌破过之前的最高点。');
+    if (!zero && fromPeak < 0) {
+      let t = '现在比最高点（' + L(peakIdx) + ' ' + money(peak) + ' 元）低 ' + pct(-fromPeak) + '，要再涨 ' + pct(needPeak) + ' 才回去';
+      const same = peakIdx === 0;
+      if (same) t += '（最高点就是本金，回去也就是回本）';
+      else if (end < P.start) t += '；比本金少 ' + pct(1 - end / P.start) + '，要涨 ' + pct(needStart) + ' 才回本';
+      facts.push(t + '。');
+      if (P.u > 0) facts.push('之后假如每' + U + '都涨 ' + pct(P.u, 2) + '：' + q(kPeak, U) + '后回到最高点' + (end < P.start && !same ? '，' + q(kStart, U) + '后回本' : '') + '。');
+      else facts.push('之后每' + U + '涨跌填的是 ' + spct(P.u, 2) + '，不涨就回不去。');
+    }
+    if (downs > 0 && n > 1) {
+      facts.push('同样这 ' + n + ' 个涨跌换个先后顺序，最后都是 ' + money(end) + ' 元（乘法不分先后）；但最坏的顺序（先涨完、再把跌的连在一起）最大回撤会到 ' + wTxt + (Math.abs(wDD - D.mdd) < 1e-12 ? '，你这串已经是最坏的排法' : wTxt === pct(-D.mdd) ? '，比实际的还深一点（显示的位数里看不出来）' : '，比实际的 ' + pct(-D.mdd) + ' 深') + '。');
+    }
+
+    const ladder = LADDER.slice();
+    if (D.mdd < 0 && !ladder.some((d) => Math.abs(d + D.mdd) < 1e-9)) ladder.push(-D.mdd);
+    ladder.sort((a, b) => a - b);
+    const ladderRows = ladder.map((d) => ({ drop: d, need: needGain(d), now: D.mdd < 0 && Math.abs(d + D.mdd) < 1e-9 }));
+
+    return { input: inp, P, n, xs, V, end, total, arith, geo, drag: arith - geo, D, peak, peakIdx, fromPeak, needPeak, needStart, kPeak, kStart, worstDD: wDD, ups, downs, bigDrop, bigRise, rows, zero, summary, facts, ladder: ladderRows };
+  }
+
+  /* ── 建议：只改一处，按改完重算的结果写 ── */
+  /* 把一串小数涨跌写回输入框的文字（百分数，最多 6 位小数） */
+  function listText(rs) { return rs.map((x) => { const v = round(x * 100, 6); return (v > 0 ? '+' : '') + String(v); }).join(' '); }
+  /* 把第 skip 期改成 0（那一期空仓） */
+  function asPctList(r, skip) { return listText(r.P.rs.map((x, i) => (i === skip ? 0 : x))); }
+  function suggestions(inp, r) {
+    const out = [];
+    const re = (patch) => calculate(Object.assign({}, inp, patch));
+    const U = r.P.unit;
+    const desc = (x) => x.zero ? '归零' : '最大回撤 ' + pct(-x.D.mdd) + '，累计 ' + spct(x.total);
+    if (r.P.w > 0.5 && r.downs > 0) {
+      const x = re({ weight: '50' });
+      out.push({ kind: 'weight', text: '只放一半仓位（另一半现金不动）：' + desc(r) + ' → ' + desc(x) + '。', apply: { weight: '50' } });
+    }
+    if (r.bigDrop && r.n > 1) {
+      const patch = { mode: 'pct', list: asPctList(r, r.bigDrop.i - 1) };
+      const x = re(patch);
+      out.push({ kind: 'skip', text: '假如第 ' + r.bigDrop.i + ' ' + QTY[U] + '那次 ' + spct(r.bigDrop.r) + ' 没赶上（那一' + QTY[U] + '空仓，记作 0）：' + desc(r) + ' → ' + desc(x) + '。', apply: patch });
+    }
+    if (r.downs > 0 && r.ups > 0 && Math.abs(r.worstDD - r.D.mdd) > 1e-12) {
+      const ord = worstOrder(r.P.rs);
+      const patch = { mode: 'pct', list: listText(ord) };
+      const x = re(patch);
+      out.push({ kind: 'order', text: '同样的涨跌换成最坏的顺序（先涨完再连跌）：' + desc(r) + ' → ' + desc(x) + '。', apply: patch });
+    }
+    return out;
+  }
+
+  /* 切换填法时把同一串涨跌换成另一种写法；原文看不懂就返回 null（保留原文，让页面报错） */
+  function convertList(inp, to) {
+    try {
+      const from = inp.mode === 'price' ? 'price' : 'pct';
+      if (from === to) return inp.list;
+      if (to === 'price') { const rs = parsePct(inp.list); if (rs.some((x) => x <= -1)) return null; let p = 100; return ['100'].concat(rs.map((x) => { p *= 1 + x; return String(Number(p.toPrecision(12))); })).join(' '); }
+      return listText(parsePrice(inp.list).rs);
+    } catch (e) { return null; }
+  }
+
+  /* ── 导出 ── */
+  function csvCell(v) { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function toCSV(r, when) {
+    const L = [];
+    L.push(['持仓页那行绿字', '导出于 ' + when].map(csvCell).join(','));
+    L.push(['结论', r.summary].map(csvCell).join(','));
+    L.push(['本金', r.P.start, '仓位', round(r.P.w, 6), '每期单位', r.P.unit].map(csvCell).join(','));
+    L.push('');
+    L.push(['期', '填的涨跌', '按仓位实际涨跌', '期末金额', '离当时最高点'].concat(r.P.prices ? ['价格'] : []).map(csvCell).join(','));
+    L.push(['0', '', '', round(r.P.start, 4), 0].concat(r.P.prices ? [r.P.prices[0]] : []).map(csvCell).join(','));
+    r.rows.forEach((x) => L.push([x.i, round(x.r, 8), round(x.x, 8), round(x.v, 4), round(x.dd, 8)].concat(r.P.prices ? [x.price] : []).map(csvCell).join(',')));
+    L.push('');
+    L.push(['累计', round(r.total, 8)].map(csvCell).join(','));
+    L.push(['简单平均每期', round(r.arith, 8)].map(csvCell).join(','));
+    L.push(['复合平均每期', round(r.geo, 8)].map(csvCell).join(','));
+    L.push(['最大回撤', round(r.D.mdd, 8)].map(csvCell).join(','));
+    L.push(['回到最高点需涨', r.needPeak === Infinity ? '回不去' : round(r.needPeak, 8)].map(csvCell).join(','));
+    return L.join('\n') + '\n';
+  }
+  function toMD(r, when, sg) {
+    const L = ['# 持仓页那行绿字', '', '导出于 ' + when + '。涨跌由使用者填写，默认数字是虚构的。', '', '**' + r.summary + '**', ''];
+    r.facts.forEach((f) => L.push('- ' + f));
+    L.push('', '| 期 | 涨跌 | 期末金额 | 离最高点 |', '|---:|---:|---:|---:|');
+    r.rows.forEach((x) => L.push('| ' + x.i + ' | ' + spct(x.x) + ' | ' + money(x.v) + ' | ' + pct(x.dd) + ' |'));
+    L.push('', '| 跌了 | 要涨多少才回来 |', '|---:|---:|');
+    r.ladder.forEach((x) => L.push('| ' + pct(x.drop) + ' | ' + pct(x.need) + ' |'));
+    if (sg && sg.length) { L.push('', '## 换个条件'); sg.forEach((s) => L.push('- ' + s.text)); }
+    L.push('', '只算填进来的涨跌，不含手续费、分红、加减仓和税；不预测以后会涨还是跌。');
+    return L.join('\n') + '\n';
+  }
+
+  const api = { QTY, q, MAXN, MAXMONEY, UNITS, LADDER, num, round, fmt, pct, spct, money, raw, tokens, parsePct, parsePrice, parse, path, drawdown, needGain, periodsTo, worstOrderDD, worstOrder, calculate, suggestions, asPctList, listText, convertList, toCSV, toMD };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.AppCore = api;
+})(typeof window !== 'undefined' ? window : this);
+
+  </script>
+  <script>
+/* 持仓页那行绿字 · 界面层 */
+(function () {
+  'use strict';
+  const C = window.AppCore;
+  const KEY = 'down-then-up:v1';
+  const DEFAULT = { mode: 'pct', list: '+12 +8 -6 +10 -18 -14 +6 +9 -8 +7 +4 -5', start: '100000', unit: '月', weight: '100', future: '1' };
+  const PRESETS = [
+    ['默认：一年 12 个月', DEFAULT],
+    ['跌一半再涨一半', { mode: 'pct', list: '-50 +50', start: '100000', unit: '期', weight: '100', future: '5' }],
+    ['涨跌一样多、来回 8 次', { mode: 'pct', list: '+20 -20 +20 -20 +20 -20 +20 -20', start: '100000', unit: '周', weight: '100', future: '1' }],
+    ['按价格填：一周收盘价', { mode: 'price', list: '10 11.2 12.1 11.37 12.5 10.25 8.82', start: '50000', unit: '天', weight: '100', future: '1' }],
+    ['三成仓位', Object.assign({}, DEFAULT, { weight: '30' })]
+  ];
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const copy = (o) => JSON.parse(JSON.stringify(o));
+  const F = ['list', 'start', 'unit', 'weight', 'future'];
+  let state = copy(DEFAULT);
+  let last = null;
+  const cls = (x) => (x > 0 ? 'up' : x < 0 ? 'down' : '');
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 隐私模式忽略 */ } }
+  function load() {
+    try {
+      const o = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+      const s = (v, n) => String(v == null ? '' : v).slice(0, n);
+      return { mode: o.mode === 'price' ? 'price' : 'pct', list: s(o.list, 8000), start: s(o.start, 20), unit: C.UNITS.indexOf(o.unit) >= 0 ? o.unit : '期', weight: s(o.weight, 10), future: s(o.future, 12) };
+    } catch (e) { return null; }
+  }
+  function fill() { F.forEach((k) => { $(k).value = state[k]; }); modeUI(); }
+  function modeUI() {
+    [].forEach.call(document.querySelectorAll('#modeChips button'), (b) => b.classList.toggle('on', b.dataset.mode === state.mode));
+    $('listLabel').textContent = state.mode === 'price'
+      ? '每期价格，按时间先后，用空格或逗号隔开；第一个是起点价'
+      : '每期涨跌幅（%），按时间先后，用空格或逗号隔开，比如「+12 -6 3.5」（默认数字是虚构的）';
+  }
+
+  /* ── 走势图：上半区金额 + 最高点 + 本金线，下半区回撤柱 ── */
+  function chart(r) {
+    const W = 640, H = 300, L = 70, R = 12, T = 12, top = 180, gap = 22, bot = H - 26, n = r.n;
+    const V = r.V, vmax = Math.max.apply(null, V.concat([r.P.start])), vmin = Math.min.apply(null, V.concat([r.P.start]));
+    const lo = vmin === vmax ? vmin * 0.9 : vmin - (vmax - vmin) * 0.08, hi = vmax + (vmax - vmin || vmax * 0.1) * 0.08;
+    /* 两端各留半根柱子宽，最后一根回撤柱不出框 */
+    const bw = Math.max(1, (W - L - R) / Math.max(1, n + 1) * 0.7), pad = bw / 2 + 2;
+    const x = (i) => L + pad + (W - L - R - 2 * pad) * (n ? i / n : 0), y = (v) => T + (top - T) * (1 - (v - lo) / (hi - lo));
+    const ddMax = Math.max(0.05, -r.D.mdd), y2 = (d) => top + gap + (bot - top - gap) * (-d / ddMax);
+    let s = '';
+    /* 刻度就写真实的最低、中间、最高金额，不写插值出来的怪数 */
+    [vmin, (vmin + vmax) / 2, vmax].filter((v, k, a) => a.indexOf(v) === k).forEach((v) => { s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '" stroke="#eef1ee"/><text x="' + (L - 4) + '" y="' + (y(v) + 4).toFixed(1) + '" font-size="10" text-anchor="end" fill="#7a847e">' + esc(C.fmt(v, v >= 1000 ? 0 : 2)) + '</text>'; });
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(r.P.start).toFixed(1) + '" y2="' + y(r.P.start).toFixed(1) + '" stroke="#b9c3bc" stroke-dasharray="4 3"/>';
+    /* 最高点阶梯 */
+    let pk = V[0], hp = [];
+    V.forEach((v, i) => { pk = Math.max(pk, v); hp.push(x(i).toFixed(1) + ',' + y(pk).toFixed(1)); });
+    s += '<polyline fill="none" stroke="#c9a227" stroke-width="1.4" points="' + hp.join(' ') + '"/>';
+    s += '<polyline fill="none" stroke="#1f2622" stroke-width="2.2" points="' + V.map((v, i) => x(i).toFixed(1) + ',' + y(v).toFixed(1)).join(' ') + '"/>';
+    if (r.D.mdd < 0) {
+      s += '<circle cx="' + x(r.D.peakAt).toFixed(1) + '" cy="' + y(V[r.D.peakAt]).toFixed(1) + '" r="4" fill="#c9a227"/>';
+      s += '<circle cx="' + x(r.D.troughAt).toFixed(1) + '" cy="' + y(V[r.D.troughAt]).toFixed(1) + '" r="4" fill="#1e8a4c"/>';
+    }
+    /* 回撤柱 */
+    s += '<text x="' + (L - 4) + '" y="' + (top + gap + 4) + '" font-size="10" text-anchor="end" fill="#7a847e">0%</text><text x="' + (L - 4) + '" y="' + (bot + 4) + '" font-size="10" text-anchor="end" fill="#7a847e">-' + esc(C.pct(ddMax)) + '</text>';
+    s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + (top + gap) + '" y2="' + (top + gap) + '" stroke="#d4dbd5"/>';
+    r.D.dd.forEach((d, i) => { if (d < 0) s += '<rect x="' + (x(i) - bw / 2).toFixed(1) + '" y="' + (top + gap) + '" width="' + bw.toFixed(1) + '" height="' + (y2(d) - top - gap).toFixed(1) + '" fill="' + (i === r.D.troughAt ? '#1e8a4c' : '#8fc3a5') + '"/>'; });
+    const lab = (i) => (i === 0 ? '起点' : '第 ' + i + ' ' + C.QTY[r.P.unit]);
+    [0, Math.round(n / 2), n].filter((v, k, a) => a.indexOf(v) === k).forEach((v, k, a) => { s += '<text x="' + x(v).toFixed(1) + '" y="' + (H - 8) + '" font-size="10" text-anchor="' + (v === 0 ? 'start' : v === n ? 'end' : 'middle') + '" fill="#7a847e">' + esc(lab(v)) + '</text>'; });
+    $('chart').innerHTML = s;
+  }
+
+  function render(r, sg) {
+    const tot = r.end - r.P.start;
+    $('hold').innerHTML =
+      '<div><small>现在</small><b>' + esc(C.money(r.end)) + '</b></div>' +
+      '<div><small>累计盈亏</small><b class="' + cls(tot) + '">' + esc((tot > 0 ? '+' : tot < 0 ? '-' : '') + C.money(Math.abs(tot))) + '</b></div>' +
+      '<div><small>累计收益率</small><b class="' + cls(r.total) + '">' + esc(C.spct(r.total)) + '</b></div>' +
+      '<div><small>离最高点</small><b class="' + cls(r.fromPeak) + '">' + esc(C.pct(r.fromPeak)) + '</b></div>' +
+      '<div><small>最大回撤</small><b class="' + cls(r.D.mdd) + '">' + esc(C.pct(r.D.mdd)) + '</b></div>';
+    $('summary').textContent = r.summary;
+    $('facts').innerHTML = r.facts.map((f) => '<li>' + esc(f) + '</li>').join('');
+    chart(r);
+    const pr = !!r.P.prices;
+    let t = '<thead><tr><th>期</th>' + (pr ? '<th>价格</th>' : '') + '<th>涨跌</th><th>期末金额</th><th>离最高点</th></tr></thead><tbody>';
+    t += '<tr class="' + (r.D.mdd < 0 && r.D.peakAt === 0 ? 'mark' : '') + '"><td>起点</td>' + (pr ? '<td>' + esc(C.fmt(r.P.prices[0], 4)) + '</td>' : '') + '<td></td><td>' + esc(C.money(r.P.start)) + '</td><td>0%</td></tr>';
+    const ddMax = Math.max(1e-9, -r.D.mdd);
+    r.rows.forEach((x) => {
+      const mk = r.D.mdd < 0 && (x.i === r.D.peakAt || x.i === r.D.troughAt);
+      t += '<tr class="' + (mk ? 'mark' : '') + '"><td>' + x.i + '</td>' + (pr ? '<td>' + esc(C.fmt(x.price, 4)) + '</td>' : '') + '<td class="' + cls(x.x) + '">' + esc(C.spct(x.x)) + '</td><td>' + esc(C.money(x.v)) + '</td><td>' + (x.dd < 0 ? '<span class="bar" style="width:' + Math.max(2, Math.round(40 * -x.dd / ddMax)) + 'px"></span> ' : '') + esc(C.pct(x.dd)) + '</td></tr>';
+    });
+    $('rows').innerHTML = t + '</tbody>';
+    let u = '<thead><tr><th>跌了</th><th>要涨多少才回来</th></tr></thead><tbody>';
+    r.ladder.forEach((x) => { u += '<tr class="' + (x.now ? 'now' : '') + '"><td>' + esc(C.pct(x.drop)) + (x.now ? '（你的最大回撤）' : '') + '</td><td>' + esc(x.need === Infinity ? '回不来' : C.pct(x.need)) + '</td></tr>'; });
+    $('ladder').innerHTML = u + '</tbody>';
+    const ul = $('sugs'); ul.innerHTML = '';
+    $('sugCard').style.display = sg.length ? '' : 'none';
+    sg.forEach((sc) => {
+      const li = document.createElement('li');
+      li.innerHTML = '<span></span><button class="ghost" data-kind="' + esc(sc.kind) + '">照这个改</button>';
+      li.querySelector('span').textContent = sc.text;
+      li.querySelector('button').addEventListener('click', () => { Object.assign(state, sc.apply); fill(); run(); });
+      ul.appendChild(li);
+    });
+  }
+  function run() {
+    [].forEach.call(document.querySelectorAll('.bad'), (e) => e.classList.remove('bad'));
+    modeUI();
+    try {
+      const r = C.calculate(state);
+      const sg = C.suggestions(state, r);
+      $('error').style.display = 'none'; $('out').style.display = '';
+      render(r, sg);
+      last = { r, sg };
+    } catch (e) {
+      last = null;
+      if (e.field) { const el = $(e.field); if (el) el.classList.add('bad'); }
+      $('error').textContent = '算不了：' + e.message; $('error').style.display = 'block';
+      $('out').style.display = 'none';
+    }
+    save();
+  }
+
+  /* ── 导出 ── */
+  function stamp() { const d = new Date(), z = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
+  function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+  function wrap(g, t, w) {
+    const NOHEAD = '，。、；：！？）」』%';
+    const out = []; let line = '';
+    const toks = String(t).match(/[+-]?[0-9][0-9,.%]*|[A-Za-z]+|[\s\S]/g) || [];
+    for (const ch of toks) {
+      if (g.measureText(line + ch).width > w && line) {
+        if (NOHEAD.indexOf(ch[0]) >= 0 || '（「『'.indexOf(line.slice(-1)) >= 0) { const l = line.slice(-1); out.push(line.slice(0, -1)); line = l + ch; }
+        else { out.push(line); line = ch.replace(/^\s+/, ''); }
+      } else line += ch;
+    }
+    if (line) out.push(line); return out;
+  }
+  function clip(g, t, w) { t = String(t); if (g.measureText(t).width <= w) return t; while (t.length > 1 && g.measureText(t + '…').width > w) t = t.slice(0, -1); return t + '…'; }
+  function drawPNG(L) {
+    const r = L.r;
+    const W = 1080, H = 1350, X = 90, TW = 900;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'); const FF = '"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillStyle = '#eef1ee'; g.fillRect(0, 0, W, H); g.fillStyle = '#fff'; g.fillRect(50, 50, 980, 1250);
+    g.fillStyle = '#66706a'; g.font = '30px ' + FF; g.fillText('持仓页那行绿字', X, 114);
+    g.font = '21px ' + FF; g.fillText(clip(g, '本金 ' + C.money(r.P.start) + ' 元 · ' + C.q(r.n, r.P.unit) + (r.P.w < 1 ? ' · 仓位 ' + C.fmt(r.P.w * 100, 2) + '%' : ''), TW), X, 150);
+    /* 三个大数 */
+    const big = [['离最高点', C.pct(r.fromPeak), r.fromPeak], ['再涨多少才回去', r.needPeak === Infinity ? '回不来' : (r.needPeak > 0 ? '+' : '') + C.pct(r.needPeak), 0], ['最大回撤', C.pct(r.D.mdd), r.D.mdd]];
+    big.forEach((b, i) => {
+      const cx = X + i * 300;
+      g.fillStyle = '#7a847e'; g.font = '20px ' + FF; g.fillText(b[0], cx, 206);
+      g.fillStyle = b[2] < 0 ? '#1e8a4c' : '#1f2622';
+      let fs = 64; g.font = 'bold ' + fs + 'px ' + FF; while (fs > 30 && g.measureText(b[1]).width > 280) { fs -= 4; g.font = 'bold ' + fs + 'px ' + FF; }
+      g.fillText(b[1], cx, 276);
+    });
+    let fs = 32, sl;
+    for (; fs >= 22; fs -= 2) { g.font = 'bold ' + fs + 'px ' + FF; sl = wrap(g, r.summary, TW); if (sl.length <= 2) break; }
+    g.fillStyle = '#1f2622';
+    let y = 340;
+    sl.slice(0, 3).forEach((l) => { g.fillText(l, X, y); y += Math.round(fs * 1.3); });
+    y += 10;
+    /* 走势 + 回撤 */
+    const ch = 260, dh = 90, V = r.V, n = r.n;
+    const vmax = Math.max.apply(null, V.concat([r.P.start])), vmin = Math.min.apply(null, V.concat([r.P.start]));
+    const lo = vmin === vmax ? vmin * 0.9 : vmin - (vmax - vmin) * 0.08, hi = vmax + (vmax - vmin || vmax * 0.1) * 0.08;
+    const bw = Math.max(2, TW / Math.max(1, n + 1) * 0.7), pad = bw / 2 + 2;
+    const px = (i) => X + pad + (TW - 2 * pad) * (n ? i / n : 0), py = (v) => y + ch * (1 - (v - lo) / (hi - lo));
+    g.strokeStyle = '#b9c3bc'; g.setLineDash([8, 6]); g.lineWidth = 2; g.beginPath(); g.moveTo(X, py(r.P.start)); g.lineTo(X + TW, py(r.P.start)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#7a847e'; g.font = '16px ' + FF; g.textAlign = 'right'; g.fillText('本金线', X + TW, py(r.P.start) + (py(r.P.start) > y + ch - 24 ? -8 : 22)); g.textAlign = 'left';
+    let pk = V[0]; g.strokeStyle = '#c9a227'; g.lineWidth = 2; g.beginPath();
+    V.forEach((v, i) => { pk = Math.max(pk, v); i ? g.lineTo(px(i), py(pk)) : g.moveTo(px(i), py(pk)); }); g.stroke();
+    g.strokeStyle = '#1f2622'; g.lineWidth = 4; g.beginPath(); V.forEach((v, i) => (i ? g.lineTo(px(i), py(v)) : g.moveTo(px(i), py(v)))); g.stroke();
+    const d0 = y + ch + 24, ddMax = Math.max(0.05, -r.D.mdd);
+    g.fillStyle = '#d4dbd5'; g.fillRect(X, d0, TW, 1);
+    r.D.dd.forEach((d, i) => { if (d < 0) { g.fillStyle = i === r.D.troughAt ? '#1e8a4c' : '#8fc3a5'; g.fillRect(px(i) - bw / 2, d0, bw, dh * (-d / ddMax)); } });
+    g.fillStyle = '#7a847e'; g.font = '16px ' + FF; g.fillText('离最高点跌了多少（最深 ' + C.pct(-r.D.mdd) + '）', X, d0 + dh + 26);
+    y = d0 + dh + 66;
+    g.fillStyle = '#1f2622'; g.font = '21px ' + FF;
+    const items = r.facts.slice(1).concat(L.sg.slice(0, 1).map((s) => '→ ' + s.text));
+    for (const t of items) {
+      const ls = wrap(g, (t.startsWith('→') ? '' : '· ') + t, TW - 20);
+      if (y + ls.length * 31 > 1236) break;
+      ls.forEach((l) => { g.fillText(l, X, y); y += 31; });
+      y += 6;
+    }
+    g.fillStyle = '#7a847e'; g.font = '18px ' + FF;
+    g.fillText('涨跌由使用者填写（默认数字虚构）；不含手续费、分红和加减仓，不预测以后的涨跌。', X, 1264);
+    return cv;
+  }
+  function backup() {
+    const r = last.r;
+    return { app: '持仓页那行绿字', version: 1, savedAt: stamp(), input: copy(state),
+      result: { summary: r.summary, end: r.end, total: r.total, arith: r.arith, geo: r.geo, maxDrawdown: r.D.mdd, peakAt: r.D.peakAt, troughAt: r.D.troughAt, recoverAt: r.D.recoverAt,
+        fromPeak: r.fromPeak, needPeak: r.needPeak === Infinity ? null : r.needPeak, needStart: r.needStart === Infinity ? null : r.needStart, periodsToPeak: r.kPeak, periodsToStart: r.kStart, worstOrderDrawdown: r.worstDD, values: r.V, facts: r.facts } };
+  }
+
+  function init() {
+    $('unit').innerHTML = C.UNITS.map((u) => '<option value="' + u + '">' + u + '</option>').join('');
+    F.forEach((k) => $(k).addEventListener('input', () => { state[k] = $(k).value; run(); }));
+    $('unit').addEventListener('change', () => { state.unit = $('unit').value; run(); });
+    $('modeChips').addEventListener('click', (e) => { const b = e.target.closest('button[data-mode]'); if (!b || b.dataset.mode === state.mode) return; const cv = C.convertList(state, b.dataset.mode); state.mode = b.dataset.mode; if (cv != null) state.list = cv; fill(); run(); });
+    const box = $('presets');
+    PRESETS.forEach((p) => {
+      const b = document.createElement('button'); b.className = 'ghost'; b.textContent = p[0];
+      b.addEventListener('click', () => { state = copy(p[1]); fill(); run(); });
+      box.appendChild(b);
+    });
+    $('reset').addEventListener('click', () => { state = copy(DEFAULT); fill(); run(); });
+    $('dlCSV').addEventListener('click', () => { if (last) download('持仓页那行绿字.csv', new Blob(['\ufeff' + C.toCSV(last.r, stamp())], { type: 'text/csv;charset=utf-8' })); });
+    $('dlMD').addEventListener('click', () => { if (last) download('持仓页那行绿字.md', new Blob([C.toMD(last.r, stamp(), last.sg)], { type: 'text/markdown;charset=utf-8' })); });
+    $('dlJSON').addEventListener('click', () => { if (last) download('持仓页那行绿字-备份.json', new Blob([JSON.stringify(backup(), null, 2)], { type: 'application/json' })); });
+    $('dlPNG').addEventListener('click', () => { if (last) drawPNG(last).toBlob((b) => download('持仓页那行绿字-1080x1350.png', b), 'image/png'); });
+    state = load() || copy(DEFAULT);
+    fill(); run();
+    window.__ex = { last: () => last, state: () => state, presets: PRESETS };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+  </script>
+</body>
+</html>
